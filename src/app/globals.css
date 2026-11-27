@@ -128,3 +128,8 @@ body {
     }
   }
 }
+
+/* 紅綠燈亮起時輕輕呼吸 */
+@keyframes yt-lamp { 0%, 100% { filter: drop-shadow(0 0 0 currentColor); } 50% { filter: drop-shadow(0 0 10px currentColor); } }
+.yt-lamp-on { animation: yt-lamp 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .yt-lamp-on { animation: none; } }

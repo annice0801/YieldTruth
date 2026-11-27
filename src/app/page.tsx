@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SideBlock } from "@/components/Blocks";
 import { Bubble, Cat, Dog, Rabbit, Turtle } from "@/components/Mascots";
 import { Parallax } from "@/components/Parallax";
+import TrafficLightGuide from "@/components/TrafficLightGuide";
 import UpgradeCompare from "@/components/UpgradeCompare";
 
 // 首頁：介紹 YieldTruth 的功能。範例數字為 2026-11-26 收盤、投入 10 萬元的真實試算（見 docs/product-rules.md）。
@@ -152,6 +153,24 @@ export default function Landing() {
               ↓ YieldTruth 幫你把真相攤開來看
             </li>
           </ul>
+        </div>
+      </section>
+
+      {/* ---------- 燈號怎麼看（紅綠燈） ---------- */}
+      <section className="relative isolate py-6">
+        <SideBlock side="right" tone="cream" dots className="inset-y-0 w-[94%] md:w-[76%]" />
+        <div className="mx-auto max-w-6xl px-4 py-14">
+          <div className="text-center">
+            <p className="text-sm font-bold text-zinc-500">燈號怎麼看？</p>
+            <h2 className="mt-2 font-[family-name:var(--font-huninn)] text-3xl leading-snug sm:text-4xl">
+              就像過馬路，
+              <br className="sm:hidden" />
+              <span className="bg-[linear-gradient(transparent_62%,#f5c93b_62%)]">看燈再走</span>
+            </h2>
+          </div>
+          <div className="yt-reveal mt-8">
+            <TrafficLightGuide />
+          </div>
         </div>
       </section>
 

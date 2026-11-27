@@ -5,6 +5,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import type { CheckCard, Level } from "@/lib/checkCard";
 import GrowthChart, { type History } from "./GrowthChart";
 import { Bubble, Cat, Dog, LINES } from "@/components/Mascots";
+import TrafficLightGuide from "@/components/TrafficLightGuide";
 
 export const HOT_CODES = [
   { code: "00878", name: "國泰永續高股息", tag: "1.25 元創新高" },
@@ -208,6 +209,16 @@ export default function CheckExperience() {
           {paywall && <Paywall feature={paywall} onUnlock={() => setProMode(true)} onClose={() => setPaywall(null)} />}
         </Phone>
       </Stage>
+
+      {/* 燈號說明：亮起目前這檔的燈 */}
+      <section className="lg:col-span-2" aria-labelledby="light-guide">
+        <h2 id="light-guide" className="text-center font-[family-name:var(--font-huninn)] text-2xl sm:text-3xl">
+          {entry?.status === "ok" ? `${entry.card.code} 現在是${LIGHT[entry.card.light].label}` : "燈號怎麼看？"}
+        </h2>
+        <div className="mt-6">
+          <TrafficLightGuide active={entry?.status === "ok" ? entry.card.light : undefined} mode={entry?.status === "ok" ? "fixed" : "cycle"} compact />
+        </div>
+      </section>
     </div>
   );
 }
