@@ -1,10 +1,12 @@
 // ETF 配息總表：每檔一列，資料來自資料庫除息紀錄、即時淨值與 e添富基本資料。
-import { connection } from "next/server";
+import { after, connection } from "next/server";
 import { cache } from "react";
+import { getDb } from "./mongodb";
+import { isStale } from "./sync";
 import { ETF_INSIGHTS } from "@/data/etfInsights";
 import { ETF_PROFILES } from "@/data/etfProfiles";
 import { fillHistory, type FillRecord } from "./checkCard";
-import { currentPrice, fetchEtfNavs } from "./market";
+import { fetchEtfNavs } from "./market";
 import { sourceHealth } from "./sourceHealth";
 import { fetchUpcomingExDividends, todayTaipei } from "./twse";
 
@@ -78,37 +80,100 @@ export function summarizeFill(history: FillRecord[], currentPrice: number | null
   };
 }
 
-export const getEtfRows = cache(async (): Promise<EtfRow[]> => {
-  await connection();
-  const today = todayTaipei();
-  const [navs, upcoming] = await Promise.all([fetchEtfNavs(), fetchUpcomingExDividends()]);
+// ---------- 預先計算的總表（存在 MongoDB etfSummary，每檔一筆） ----------
+// 配息、填息這些只在收盤後才會變的資料先算好存起來；開頁時只讀一次資料庫，再疊加即時淨值。
 
-  return Promise.all(
-    ETF_PROFILES.map(async (p) => {
+type SummaryDoc = {
+  _id: string; // 代號
+  name: string;
+  active: boolean;
+  frequency: Frequency;
+  history: FillRecord[]; // 近 8 次除息與填息
+  lastClose: number | null; // 資料庫最新收盤（即時淨值拿不到時的備援）
+  next: EtfRow["next"];
+  health: EtfRow["health"];
+  aumYi: number | null;
+  updatedAt: Date;
+};
+
+async function summaryCol() {
+  return (await getDb()).collection<SummaryDoc>("etfSummary");
+}
+
+let building: Promise<SummaryDoc[]> | null = null;
+
+/** 重新計算全部 ETF 的總表資料（會視需要向證交所補抓），由每日排程或資料過期時觸發 */
+export function buildEtfSummary(): Promise<SummaryDoc[]> {
+  building ??= (async () => {
+    const today = todayTaipei();
+    const upcoming = await fetchUpcomingExDividends();
+    const db = await getDb();
+    const col = await summaryCol();
+    const docs: SummaryDoc[] = [];
+    for (const p of ETF_PROFILES) {
       const history = await fillHistory(p.code, { requests: 0 }).catch(() => [] as FillRecord[]);
-      const latest = history[history.length - 1] ?? null;
-      const freq = frequencyOf(history);
-      const count = PER_YEAR[freq];
-      const nav = navs.get(p.code);
-      // 即時淨值拿不到時，依序改用即時成交價、資料庫最新收盤
-      const price = nav?.price ?? (await currentPrice(p.code).catch(() => null))?.price ?? null;
+      const last = await db.collection("prices").find({ code: p.code }).sort({ date: -1 }).limit(1).next();
       const up = upcoming.filter((u) => u.code === p.code && u.exDate >= today).sort((a, b) => a.exDate.localeCompare(b.exDate))[0];
       const insight = ETF_INSIGHTS.find((e) => e.code === p.code);
-      return {
-        code: p.code,
+      const doc: SummaryDoc = {
+        _id: p.code,
         name: p.short,
         active: p.code.endsWith("A"),
-        frequency: freq,
-        latest: latest ? { exDate: latest.exDate, cash: latest.cash, prevClose: latest.prevClose } : null,
-        periodYieldPct: latest ? (latest.cash / latest.prevClose) * 100 : null,
-        annualYieldPct: latest && price && count ? ((latest.cash * count) / price) * 100 : null,
-        price,
-        premiumPct: nav?.premiumPct ?? null,
+        frequency: frequencyOf(history),
+        history,
+        lastClose: (last?.close as number | undefined) ?? null,
         next: up ? { exDate: up.exDate, lastBuyDate: prevWeekday(up.exDate), cash: up.cash } : null,
-        fill: summarizeFill(history, price),
         health: sourceHealth(insight?.composition ?? null)?.level ?? null,
         aumYi: p.aumYi,
-      } satisfies EtfRow;
-    }),
-  );
+        updatedAt: new Date(),
+      };
+      await col.replaceOne({ _id: p.code }, doc, { upsert: true });
+      docs.push(doc);
+    }
+    return docs;
+  })().finally(() => {
+    building = null;
+  });
+  return building;
+}
+
+async function readSummary(): Promise<SummaryDoc[]> {
+  const docs = await (await summaryCol()).find().toArray();
+  // 第一次（還沒算過）只能當場算；之後資料過期就在回應送出後於背景重算，不讓使用者等
+  if (docs.length < ETF_PROFILES.length) return buildEtfSummary();
+  if (docs.some((d) => isStale(d.updatedAt))) after(() => buildEtfSummary().catch(() => undefined));
+  const order = new Map(ETF_PROFILES.map((p, i) => [p.code, i]));
+  return docs.sort((a, b) => (order.get(a._id) ?? 99) - (order.get(b._id) ?? 99));
+}
+
+/** 單檔的近 8 次除息與填息紀錄（詳細頁用） */
+export async function getSummaryHistory(code: string): Promise<FillRecord[] | null> {
+  const doc = await (await summaryCol()).findOne({ _id: code });
+  return doc?.history ?? null;
+}
+
+export const getEtfRows = cache(async (): Promise<EtfRow[]> => {
+  await connection();
+  const [docs, navs] = await Promise.all([readSummary(), fetchEtfNavs()]);
+  return docs.map((d) => {
+    const nav = navs.get(d._id);
+    const price = nav?.price ?? d.lastClose; // 即時淨值拿不到時用資料庫最新收盤
+    const latest = d.history[d.history.length - 1] ?? null;
+    const count = PER_YEAR[d.frequency];
+    return {
+      code: d._id,
+      name: d.name,
+      active: d.active,
+      frequency: d.frequency,
+      latest: latest ? { exDate: latest.exDate, cash: latest.cash, prevClose: latest.prevClose } : null,
+      periodYieldPct: latest ? (latest.cash / latest.prevClose) * 100 : null,
+      annualYieldPct: latest && price && count ? ((latest.cash * count) / price) * 100 : null,
+      price,
+      premiumPct: nav?.premiumPct ?? null,
+      next: d.next,
+      fill: summarizeFill(d.history, price),
+      health: d.health,
+      aumYi: d.aumYi,
+    } satisfies EtfRow;
+  });
 });

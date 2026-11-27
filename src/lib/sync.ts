@@ -68,10 +68,26 @@ function taipeiHHMMOf(d: Date) {
 }
 
 /** 上次同步之後，證交所是否可能有新的日資料 */
-function isStale(syncedAt: Date) {
+export function isStale(syncedAt: Date) {
+  // 最近一次「證交所可能有新資料」的時間點：今天 14:30（已過）或前一個平日 14:30
   const today = todayTaipei();
-  if (taipeiDateOf(syncedAt) < today) return true;
-  return nowTaipeiHHMM() >= DAILY_READY_HHMM && taipeiHHMMOf(syncedAt) < DAILY_READY_HHMM;
+  let ready = nowTaipeiHHMM() >= DAILY_READY_HHMM ? today : prevWeekday(today);
+  if (isWeekend(ready)) ready = prevWeekday(ready);
+  const synced = taipeiDateOf(syncedAt);
+  if (synced > ready) return false;
+  if (synced < ready) return true;
+  return taipeiHHMMOf(syncedAt) < DAILY_READY_HHMM;
+}
+
+function isWeekend(iso: string) {
+  const d = new Date(`${iso}T00:00:00Z`).getUTCDay();
+  return d === 0 || d === 6;
+}
+function prevWeekday(iso: string) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  do d.setUTCDate(d.getUTCDate() - 1);
+  while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
+  return d.toISOString().slice(0, 10);
 }
 
 // 同一檔同時只跑一個同步，避免兩個請求重複回補

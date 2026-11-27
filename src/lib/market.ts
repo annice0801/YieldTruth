@@ -22,7 +22,7 @@ export async function fetchEtfNavs(): Promise<Map<string, EtfNav>> {
   if (navCache && Date.now() - navCache.at < 20_000) return navCache.data;
   const data = new Map<string, EtfNav>();
   try {
-    const res = await fetch("https://mis.twse.com.tw/stock/data/all_etf.txt", { signal: AbortSignal.timeout(6_000) });
+    const res = await fetch("https://mis.twse.com.tw/stock/data/all_etf.txt", { signal: AbortSignal.timeout(3_000) });
     const json = (await res.json()) as { a1?: { msgArray?: Record<string, string | number>[] }[] };
     for (const r of (json.a1 ?? []).flatMap((b) => b.msgArray ?? [])) {
       const price = Number(r.e);

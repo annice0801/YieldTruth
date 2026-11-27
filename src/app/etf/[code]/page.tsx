@@ -10,7 +10,7 @@ import { withTerms } from "@/components/withTerms";
 import { ETF_INSIGHTS } from "@/data/etfInsights";
 import { ETF_PROFILES, profileOf, type EtfProfile } from "@/data/etfProfiles";
 import { fillHistory } from "@/lib/checkCard";
-import { getEtfRows } from "@/lib/etfTable";
+import { getEtfRows, getSummaryHistory } from "@/lib/etfTable";
 import { EtfCard } from "../parts";
 
 export function generateStaticParams() {
@@ -222,7 +222,8 @@ async function KeyStats({ code, profile }: { code: string; profile: EtfProfile }
 
 async function History({ code }: { code: string }) {
   await connection(); // 配息紀錄每次請求即時讀取，不在建置時預先產生
-  const rows = (await fillHistory(code, { requests: 0 }).catch(() => [])).reverse();
+  // 先讀預先算好的總表資料；沒有才當場計算
+  const rows = [...((await getSummaryHistory(code)) ?? (await fillHistory(code, { requests: 0 }).catch(() => [])))].reverse();
   if (rows.length === 0) return <p className="yt-card-flat mt-4 p-5 text-sm text-zinc-600">沒有除息紀錄。</p>;
   return (
     <div className="yt-card mt-4 overflow-x-auto">
