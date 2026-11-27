@@ -1,6 +1,8 @@
+import { connection } from "next/server";
 import { createAlert, deleteAlert, listAlerts, type AlertConditions } from "@/lib/alerts";
 
 export async function GET() {
+  await connection(); // 每次請求才查資料庫，建置時不執行
   const alerts = await listAlerts();
   return Response.json(alerts.map((a) => ({ ...a, _id: a._id.toHexString() })));
 }

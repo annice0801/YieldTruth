@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Backdrop } from "@/components/Blocks";
 import CheckExperience from "./CheckExperience";
 
@@ -12,7 +13,10 @@ export default function CheckPage() {
     <div className="relative isolate flex-1">
       <Backdrop />
       <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:py-12">
-      <CheckExperience />
+      {/* 內容依「今天」推算買進日期，需在請求時才渲染 */}
+      <Suspense fallback={<div className="h-[720px] animate-pulse rounded-[48px] bg-[#f3eddc]" />}>
+        <CheckExperience />
+      </Suspense>
     </main>
     </div>
   );
