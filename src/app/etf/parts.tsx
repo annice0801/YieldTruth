@@ -1,12 +1,11 @@
 import { Suspense } from "react";
-import { ETF_INSIGHTS, HOLDER_RANKING, type Composition, type EtfInsight, type Source } from "@/data/etfInsights";
+import { HOLDER_RANKING, type Composition, type EtfInsight, type Source } from "@/data/etfInsights";
 import { withTerms } from "@/components/withTerms";
-import { getFillStatuses } from "@/lib/fillStatus";
+import { getEtfRows } from "@/lib/etfTable";
+import { todayTaipei } from "@/lib/twse";
 import { sourceHealth, SHS_WEIGHTS } from "@/lib/sourceHealth";
 
 // 配息觀察頁與各檔詳細頁共用的元件
-
-const CODES = ETF_INSIGHTS.map((e) => e.code);
 
 // ---------- ETF 卡片 ----------
 
@@ -98,14 +97,19 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 }
 
 export async function Fill({ code }: { code: string }) {
-  const s = (await getFillStatuses(CODES)).get(code);
-  if (!s) return <p className="mt-1 text-sm text-zinc-500">無除息紀錄或即時價</p>;
+  // 讀資料庫裡存好的總表（現價為最近一次更新時的成交價），開頁不連證交所
+  const r = (await getEtfRows()).find((x) => x.code === code);
+  if (!r || !r.latest || r.price === null || !r.fill.latestState) return <p className="mt-1 text-sm text-zinc-500">無除息紀錄或價格資料</p>;
+  const { cash, prevClose, exDate } = r.latest;
+  const ref = prevClose - cash;
+  const state = r.fill.latestState;
   // 貼息時用「還要漲多少才填息」表達；用配息倍數表示會出現 600% 這種難以理解的數字
-  const needRise = ((s.prevClose - s.price) / s.price) * 100;
-  const label =
-    s.state === "filled" ? "已填息" : s.state === "discount" ? `貼息，需漲 ${needRise.toFixed(1)}%` : `填息 ${s.progressPct.toFixed(0)}%`;
-  const icon = s.state === "filled" ? "●" : s.state === "discount" ? "■" : "▲";
-  const color = s.state === "filled" ? "var(--status-good)" : s.state === "discount" ? "var(--status-critical)" : "var(--status-warning)";
+  const needRise = ((prevClose - r.price) / r.price) * 100;
+  const progress = ((r.price - ref) / cash) * 100;
+  const label = state === "filled" ? "已填息" : state === "discount" ? `貼息，需漲 ${needRise.toFixed(1)}%` : `填息 ${progress.toFixed(0)}%`;
+  const icon = state === "filled" ? "●" : state === "discount" ? "■" : "▲";
+  const color = state === "filled" ? "var(--status-good)" : state === "discount" ? "var(--status-critical)" : "var(--status-warning)";
+  const days = Math.round((Date.parse(todayTaipei()) - Date.parse(exDate)) / 86_400_000);
   return (
     <>
       <p className="mt-1 flex items-center gap-1.5 text-lg font-semibold tabular-nums">
@@ -115,7 +119,7 @@ export async function Fill({ code }: { code: string }) {
         {label}
       </p>
       <p className="mt-0.5 text-xs text-zinc-500">
-        現價 {s.price}，填息目標 {s.prevClose}（除息後 {s.daysSince} 天）
+        現價 {r.price}，填息目標 {prevClose}（除息後 {days} 天）
       </p>
     </>
   );

@@ -4,7 +4,8 @@ import { Backdrop } from "@/components/Blocks";
 import { Bubble, Cat } from "@/components/Mascots";
 import { withTerms } from "@/components/withTerms";
 import { HOLDER_RANKING, TRENDS } from "@/data/etfInsights";
-import { getEtfRows } from "@/lib/etfTable";
+import RefreshBar from "@/components/RefreshBar";
+import { getEtfRows, getSummaryMeta } from "@/lib/etfTable";
 import EtfTableView from "./EtfTableView";
 import { HolderBars, SourceLink } from "./parts";
 
@@ -91,5 +92,13 @@ export default function EtfPage() {
 
 async function Table() {
   const rows = await getEtfRows();
-  return <EtfTableView rows={rows} />;
+  const meta = await getSummaryMeta();
+  return (
+    <>
+      <RefreshBar meta={meta} />
+      <div className="mt-5">
+        <EtfTableView rows={rows} />
+      </div>
+    </>
+  );
 }

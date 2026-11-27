@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     await ensurePrices(code, from, report).catch(() => failed.push(code));
   }
   await institutional5d("0056", report).catch(() => undefined); // 補齊近 5 日三大法人
-  await buildEtfSummary();
+  await buildEtfSummary("排程");
 
   return Response.json({ codes: codes.length, failed, twseRequests: report.requests, ms: Date.now() - started });
 }

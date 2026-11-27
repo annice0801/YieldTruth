@@ -37,6 +37,12 @@ function FillCell({ f }: { f: EtfRow["fill"] }) {
   );
 }
 
+function PremiumTag({ p }: { p: number | null }) {
+  if (p === null) return <span className="block text-[11px] text-zinc-400">收盤價</span>;
+  const tone = p > 1 ? "text-[var(--coral)]" : "text-zinc-500";
+  return <span className={`block text-[11px] ${tone}`}>{p >= 0 ? `溢價 ${p.toFixed(2)}%` : `折價 ${Math.abs(p).toFixed(2)}%`}</span>;
+}
+
 function StateBadge({ s }: { s: EtfRow["fill"]["latestState"] }) {
   if (!s) return <span className="text-zinc-400">—</span>;
   const m = {
@@ -97,11 +103,14 @@ export default function EtfTableView({ rows }: { rows: EtfRow[] }) {
 
       {/* 平板以上：表格 */}
       <div className="yt-card mt-4 hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[860px] text-sm">
+        <table className="w-full min-w-[940px] text-sm">
           <thead>
             <tr className="bg-[#1d1d1b] text-left text-xs text-white">
               <th className="rounded-tl-3xl px-4 py-3 font-bold">代號／名稱</th>
               <th className="px-3 py-3 font-bold">配息頻率</th>
+              <th className="px-3 py-3 text-right font-bold">
+                現價／<Term t="折溢價" />
+              </th>
               <th className="px-3 py-3 text-right font-bold">最新配息</th>
               <th className="px-3 py-3 text-right font-bold">單次殖利率</th>
               <th className="px-3 py-3 text-right font-bold">
@@ -129,6 +138,10 @@ export default function EtfTableView({ rows }: { rows: EtfRow[] }) {
                 </td>
                 <td className="px-3 py-3">
                   <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${FREQ_STYLE[r.frequency]}`}>{r.frequency}</span>
+                </td>
+                <td className="px-3 py-3 text-right tabular-nums">
+                  <span className="font-bold">{r.price ?? "—"}</span>
+                  <PremiumTag p={r.premiumPct} />
                 </td>
                 <td className="px-3 py-3 text-right tabular-nums">
                   {r.latest ? (
@@ -185,7 +198,12 @@ export default function EtfTableView({ rows }: { rows: EtfRow[] }) {
                 </div>
                 <span aria-hidden className="text-lg">→</span>
               </div>
-              <dl className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+              <dl className="mt-3 grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
+                <div className="rounded-2xl bg-[#f3eddc] p-2">
+                  <dt className="text-zinc-500">現價</dt>
+                  <dd className="mt-0.5 font-bold tabular-nums">{r.price ?? "—"}</dd>
+                  <PremiumTag p={r.premiumPct} />
+                </div>
                 <div className="rounded-2xl bg-[#f3eddc] p-2">
                   <dt className="text-zinc-500">最新配息</dt>
                   <dd className="mt-0.5 font-bold tabular-nums">{r.latest?.cash ?? "—"}</dd>

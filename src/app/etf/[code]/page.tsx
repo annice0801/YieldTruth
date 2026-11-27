@@ -10,7 +10,8 @@ import { withTerms } from "@/components/withTerms";
 import { ETF_INSIGHTS } from "@/data/etfInsights";
 import { ETF_PROFILES, profileOf, type EtfProfile } from "@/data/etfProfiles";
 import { fillHistory } from "@/lib/checkCard";
-import { getEtfRows, getSummaryHistory } from "@/lib/etfTable";
+import RefreshBar from "@/components/RefreshBar";
+import { getEtfRows, getSummaryHistory, getSummaryMeta } from "@/lib/etfTable";
 import { EtfCard } from "../parts";
 
 export function generateStaticParams() {
@@ -107,7 +108,9 @@ export default async function EtfDetailPage({ params }: { params: Promise<{ code
             {insight ? (
               <EtfCard e={insight} />
             ) : (
-              <p className="yt-card-flat p-5 text-sm text-zinc-600">{withTerms("這檔尚未收錄配息組成報導。可在下方歷次配息紀錄查看填息狀況；組成請以投信的收益分配通知書為準。")}</p>
+              <p className="yt-card-flat p-5 text-sm text-zinc-600">
+                {withTerms("這檔尚未收錄配息組成報導。可在下方歷次配息紀錄查看填息狀況；組成請以投信的收益分配通知書為準。")}
+              </p>
             )}
           </div>
         </section>
@@ -174,12 +177,16 @@ function Performance({ p }: { p: EtfProfile }) {
 }
 
 async function KeyStats({ code, profile }: { code: string; profile: EtfProfile }) {
-  const row = (await getEtfRows()).find((r) => r.code === code);
+  const [rows, meta] = await Promise.all([getEtfRows(), getSummaryMeta()]);
+  const row = rows.find((r) => r.code === code);
   const stats: { label: React.ReactNode; value: string; sub?: string; tone: string }[] = [
     {
       label: "現價",
       value: row?.price ? String(row.price) : "—",
-      sub: row?.premiumPct !== null && row?.premiumPct !== undefined ? `${row.premiumPct >= 0 ? "溢價" : "折價"} ${Math.abs(row.premiumPct).toFixed(2)}%` : undefined,
+      sub:
+        row?.premiumPct !== null && row?.premiumPct !== undefined
+          ? `${row.premiumPct >= 0 ? "溢價" : "折價"} ${Math.abs(row.premiumPct).toFixed(2)}%`
+          : undefined,
       tone: "bg-white",
     },
     {
@@ -188,7 +195,12 @@ async function KeyStats({ code, profile }: { code: string; profile: EtfProfile }
       sub: row?.latest ? `${row.latest.exDate} 除息・${row.frequency}` : undefined,
       tone: "bg-[#fff1b8]",
     },
-    { label: <Term t="年化殖利率" />, value: row?.annualYieldPct ? `${row.annualYieldPct.toFixed(1)}%` : "—", sub: "最近一次 × 一年次數 ÷ 現價", tone: "bg-white" },
+    {
+      label: <Term t="年化殖利率" />,
+      value: row?.annualYieldPct ? `${row.annualYieldPct.toFixed(1)}%` : "—",
+      sub: "最近一次 × 一年次數 ÷ 現價",
+      tone: "bg-white",
+    },
     {
       label: (
         <>
@@ -196,7 +208,10 @@ async function KeyStats({ code, profile }: { code: string; profile: EtfProfile }
         </>
       ),
       value: row?.fill.avgDays !== null && row?.fill.avgDays !== undefined ? `${row.fill.avgDays} 天` : "—",
-      sub: row && row.fill.samples ? `近 ${row.fill.samples} 次・${row.fill.unfilled} 次未填息${row.fill.pending ? `・${row.fill.pending} 次觀察中` : ""}` : undefined,
+      sub:
+        row && row.fill.samples
+          ? `近 ${row.fill.samples} 次・${row.fill.unfilled} 次未填息${row.fill.pending ? `・${row.fill.pending} 次觀察中` : ""}`
+          : undefined,
       tone: "bg-[#d9f0e4]",
     },
     {
@@ -208,15 +223,20 @@ async function KeyStats({ code, profile }: { code: string; profile: EtfProfile }
     { label: "資產規模", value: `${Math.round(profile.aumYi).toLocaleString()} 億`, sub: `受益人 ${profile.holdersWan} 萬`, tone: "bg-white" },
   ];
   return (
-    <dl className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-      {stats.map((s, i) => (
-        <div key={i} className={`yt-card p-4 ${s.tone}`}>
-          <dt className="text-xs font-bold text-zinc-500">{s.label}</dt>
-          <dd className="mt-1 text-xl font-bold tabular-nums">{s.value}</dd>
-          {s.sub && <dd className="mt-0.5 text-[11px] text-zinc-500">{s.sub}</dd>}
-        </div>
-      ))}
-    </dl>
+    <>
+      <div className="mt-6">
+        <RefreshBar meta={meta} />
+      </div>
+      <dl className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        {stats.map((s, i) => (
+          <div key={i} className={`yt-card p-4 ${s.tone}`}>
+            <dt className="text-xs font-bold text-zinc-500">{s.label}</dt>
+            <dd className="mt-1 text-xl font-bold tabular-nums">{s.value}</dd>
+            {s.sub && <dd className="mt-0.5 text-[11px] text-zinc-500">{s.sub}</dd>}
+          </div>
+        ))}
+      </dl>
+    </>
   );
 }
 
