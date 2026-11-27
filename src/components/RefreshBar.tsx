@@ -63,7 +63,6 @@ export default function RefreshBar({ meta }: { meta: SummaryMeta }) {
         ) : (
           "尚未建立資料"
         )}
-        <span className="mt-0.5 block text-xs text-zinc-500">開頁只讀資料庫；按「取得最新資料」才向證交所更新成交價與配息，更新後所有人都會看到。</span>
       </p>
       <div className="flex w-full flex-col gap-1 sm:w-auto sm:items-end">
         <button onClick={refresh} disabled={loading} className="yt-btn w-full !px-4 !py-2 text-sm sm:w-auto">
